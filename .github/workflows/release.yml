@@ -9,45 +9,27 @@ jobs:
         runs-on: ${{ matrix.os }}
         strategy:
             matrix:
-                os: [windows-latest, ubuntu-latest, macos-latest]
-                arch: ['386', amd64]
+                os: [ubuntu-24.04-arm]
+                arch: [arm64]
                 # We sometimes use different verbiage for things (e.g. "darwin"
                 # for the GOOS build flag and "osx" in the actual release ZIP).
                 # We need to specify those here.
                 include:
-                    - os: windows-latest
-                      goos: windows
-                      bin: 'gophish.exe'
-                      releaseos: windows
-                    - os: ubuntu-latest
+                    - os: ubuntu-24.04-arm
                       goos: linux
                       bin: 'gophish'
                       releaseos: linux
-                    - os: macos-latest
-                      goos: darwin
-                      bin: 'gophish'
-                      releaseos: osx
-                # Don't build windows-32bit due to missing MinGW dependencies
-                # Don't build osx-32bit due to eventual drop in Go support
-                exclude:
-                    - os: windows-latest
-                      arch: '386'
-                    - os: macos-latest
-                      arch: '386'
         steps:
             - name: Set up Go
-              uses: actions/setup-go@v2
+              uses: actions/setup-go@v5
               with:
-                go-version: 1.22
-            - if: matrix.os == 'ubuntu-latest'
-              run: sudo apt-get update && sudo apt-get install -y gcc-multilib
-            - if: matrix.arch == '386'
-              run: echo "RELEASE=gophish-${{ github.event.release.tag_name }}-${{ matrix.releaseos }}-32bit" >> $GITHUB_ENV
-            - if: matrix.arch == 'amd64'
-              run: echo "RELEASE=gophish-${{ github.event.release.tag_name }}-${{ matrix.releaseos }}-64bit" >> $GITHUB_ENV
-            - if: matrix.os == 'windows-latest'
-              run: echo "RELEASE=gophish-${{ github.event.release.tag_name }}-${{ matrix.releaseos }}-64bit" | Out-File -FilePath $env:GITHUB_ENV -Append # https://github.com/actions/runner/issues/1636
+                go-version: 1.26
             - uses: actions/checkout@v4
+            - name: Get version
+              id: get_version
+              run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
+            - name: Set Release Name
+              run: echo "RELEASE=gophish-v${{ steps.get_version.outputs.VERSION }}-${{ matrix.releaseos }}-${{ matrix.arch }}" >> $GITHUB_ENV
             - name: Build ${{ matrix.goos }}/${{ matrix.arch }}
               run: go build -o ${{ matrix.bin }}
               env:
@@ -62,7 +44,7 @@ jobs:
 
     package:
         name: Package Assets
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04-arm
         needs: build
         steps:
             - uses: actions/checkout@v4
@@ -103,7 +85,7 @@ jobs:
     
     upload:
         name: Upload to the Release
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04-arm
         needs: package
         steps:
             - uses: actions/download-artifact@v4
